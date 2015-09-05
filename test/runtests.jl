@@ -225,7 +225,7 @@ test_MultiProductVSs()
 
 # PowerVS
 
-function test_PowerVS(S::Type, V1::Type, D::Integer, e1)
+function test_PowerVS(S::Type, V1::Type, D::Integer, n::Tuple, e1)
     e1::V1
     V = PowerVS{S,V1,D}
     @test veltype(V) === S
@@ -236,40 +236,55 @@ function test_PowerVS(S::Type, V1::Type, D::Integer, e1)
     z = vnull(V, ntuple(d->1,D))
     @test vdim(z) == vdim(vnull(V1))
 
-    n = ntuple(d->d+3,D)
     z = vnull(V, n)
-    @test z.v1[1] == vnull(V1)
-    @test z.v1[(end+1)÷2] == vnull(V1)
-    @test z.v1[end] == vnull(V1)
+    if prod(n)>0
+        @test z.v1[1] == vnull(V1)
+        @test z.v1[(end+1)÷2] == vnull(V1)
+        @test z.v1[end] == vnull(V1)
+    end
     @test vdim(z) == prod(n) * vdim(vnull(V1))
     @test vscale(one(S), z) == z
     @test vadd(z, z) == z
 
     e = V(deepcopy(z.v1))
-    e.v1[1] = e1
+    if prod(n)>0
+        e.v1[1] = e1
+    end
     @test vscale(zero(S), e) == z
     @test vscale(one(S), e) == e
-    @test vscale(2*one(S), e).v1[1] == vscale(2, e1)
-    if D>0
-        @test vscale(2*one(S), e).v1[2] == vnull(V1)
-        @test vscale(2*one(S), e).v1[end] == vnull(V1)
+    if prod(n)>0
+        @test vscale(2*one(S), e).v1[1] == vscale(2, e1)
+        if D>0
+            @test vscale(2*one(S), e).v1[2] == vnull(V1)
+            @test vscale(2*one(S), e).v1[end] == vnull(V1)
+        end
     end
     @test vadd(z, e) == e
     @test vadd(e, z) == e
-    @test vadd(e, e).v1[1] == vadd(e1, e1)
-    if D>0
-        @test vadd(e, e).v1[2] == vnull(V1)
-        @test vadd(e, e).v1[end] == vnull(V1)
+    if prod(n)>0
+        @test vadd(e, e).v1[1] == vadd(e1, e1)
+        if D>0
+            @test vadd(e, e).v1[2] == vnull(V1)
+            @test vadd(e, e).v1[end] == vnull(V1)
+        end
     end
 
     @test typeof(collect(z)) === Vector{S}
     @test collect(z) == repeat(collect(vnull(V1)), outer=[prod(n)])
     @test typeof(collect(e)) === Vector{S}
-    @test collect(e) == vcat(collect(e1),
-                             repeat(collect(vnull(V1)), outer=[prod(n)-1]))
+    if prod(n)>0
+        @test collect(e) == vcat(collect(e1),
+                                 repeat(collect(vnull(V1)), outer=[prod(n)-1]))
+    else
+        @test collect(e) == []
+    end
 
     zs = "$(vnull(V1))"
-    @test "$z" == "VS{$S}[" * (zs*",")^(prod(n)-1) * zs * "]"
+    if prod(n)>0
+        @test "$z" == "VS{$S}[" * (zs*",")^(prod(n)-1) * zs * "]"
+    else
+        @test "$z" == "VS{$S}[]"
+    end
 end
 function test_PowerVSs()
     # test_PowerVS(Bool)
@@ -280,14 +295,19 @@ function test_PowerVSs()
     e1i = V1I(1)
     e2i = V2I(e1i, e1i)
 
-    test_PowerVS(Int, V0I, 1, e0i)
-    test_PowerVS(Int, V1I, 1, e1i)
-    test_PowerVS(Int, V2I, 0, e2i)
-    test_PowerVS(Int, V2I, 1, e2i)
-    test_PowerVS(Int, V2I, 2, e2i)
+    for n in (0,3)
+        test_PowerVS(Int, V0I, 1, (n,), e0i)
+        test_PowerVS(Int, V1I, 1, (n,), e1i)
+        test_PowerVS(Int, V0I, 1, (n,), e0i)
+        test_PowerVS(Int, V1I, 1, (n,), e1i)
+        test_PowerVS(Int, V2I, 0, (), e2i)
+        test_PowerVS(Int, V2I, 1, (n,), e2i)
+        test_PowerVS(Int, V2I, 2, (n,n), e2i)
+        test_PowerVS(Int, V2I, 2, (n,n+1), e2i)
+    end
 
-    test_PowerVS(Float64, ScalarVS{Float64}, 1, ScalarVS{Float64}(1))
-    test_PowerVS(Complex128, ScalarVS{Complex128}, 2,
+    test_PowerVS(Float64, ScalarVS{Float64}, 1, (3,), ScalarVS{Float64}(1))
+    test_PowerVS(Complex128, ScalarVS{Complex128}, 2, (3,4),
                  ScalarVS{Complex128}(1+im))
 end
 test_PowerVSs()
