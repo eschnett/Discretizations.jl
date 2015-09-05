@@ -200,6 +200,15 @@ function test_MultiProductVS(S::Type, VS::Type, es::Tuple)
     @test vdim(z) == mapreduce(vdim, +, 0, map(vnull, tupletypes(VS)))
 
     @test vscale(one(S), z) == z
+    @test vadd(z, z) == z
+    e = V(es)
+    @test vscale(zero(S), e) == z
+    @test vscale(one(S), e) == e
+    @test vscale(2*one(S), e).vs == map(x->vscale(2, x), es)
+    @test vadd(z, e) == e
+    @test vadd(e, z) == e
+    @test vadd(e, e).vs == map(vadd, es, es)
+
     # TODO
 end
 function test_MultiProductVSs()

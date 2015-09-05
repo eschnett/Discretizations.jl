@@ -205,10 +205,20 @@ vnewtype{S,VS}(V::Type{MultiProductVS{S,VS}}, R::Type) = MultiProductVS{R,VS}
 vnull{S,VS}(V::Type{MultiProductVS{S,VS}}) = V(map(vnull, tupletypes(VS)))
 vdim(x::MultiProductVS) = mapreduce(vdim, +, 0, x.vs)
 function vscale(a, x::MultiProductVS)
-    rs = map(v->vscale(a, v), x.vs)
+    rs = map(x->vscale(a, x), x.vs)
     RS = map(typeof, rs)
     if isempty(RS)
         S = typeof(a * zero(veltype(typeof(x))))
+    else
+        S = mapreduce(veltype, typesame, RS)
+    end
+    MultiProductVS{S,Tuple{RS...}}(rs)
+end
+function vadd(x::MultiProductVS, y::MultiProductVS)
+    rs = map(vadd, x.vs, y.vs)
+    RS = map(typeof, rs)
+    if isempty(RS)
+        S = typeof(zero(veltype(typeof(x))) + zero(veltype(typeof(y))))
     else
         S = mapreduce(veltype, typesame, RS)
     end
