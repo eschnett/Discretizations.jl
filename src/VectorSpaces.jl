@@ -224,7 +224,6 @@ function vadd(x::MultiProductVS, y::MultiProductVS)
     end
     MultiProductVS{S,Tuple{RS...}}(rs)
 end
-# TODO
 
 function show{S,VS}(io::IO, x::MultiProductVS{S,VS})
     print(io, "VS{$S}[")

@@ -210,6 +210,9 @@ function test_MultiProductVS(S::Type, VS::Type, es::Tuple)
     @test vadd(e, e).vs == map(vadd, es, es)
 
     # TODO
+
+    zs = join(map(string, map(vnull, tupletypes(VS))), ",")
+    @test "$z" == "VS{$S}[$zs]"
 end
 function test_MultiProductVSs()
     V0I = EmptyVS{Int}
@@ -223,6 +226,7 @@ function test_MultiProductVSs()
     test_MultiProductVS(Int, Tuple{V1I, V1I}, (e1i, e1i))
 
     test_MultiProductVS(Int, Tuple{}, ())
+    test_MultiProductVS(Int, Tuple{V0I}, (e0i,))
     test_MultiProductVS(Int, Tuple{V1I}, (e1i,))
     test_MultiProductVS(Int, Tuple{V1I, V1I, V1I}, (e1i, e1i, e1i))
 
