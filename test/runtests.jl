@@ -209,7 +209,10 @@ function test_MultiProductVS(S::Type, VS::Type, es::Tuple)
     @test vadd(e, z) == e
     @test vadd(e, e).vs == map(vadd, es, es)
 
-    # TODO
+    @test typeof(collect(z)) === Vector{S}
+    @test collect(z) == vcat(map(collect, map(vnull, tupletypes(VS)))...)
+    @test typeof(collect(e)) === Vector{S}
+    @test collect(e) == vcat(map(collect, es)...)
 
     zs = join(map(string, map(vnull, tupletypes(VS))), ",")
     @test "$z" == "VS{$S}[$zs]"

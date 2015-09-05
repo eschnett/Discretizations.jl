@@ -234,7 +234,36 @@ function show{S,VS}(io::IO, x::MultiProductVS{S,VS})
     print(io, "]")
 end
 
-# TODO
+"advance outer iterator while inner iterator is done"
+function _advance(x::MultiProductVS, st,el,sti)
+    while !done(x.vs,st) && done(el,sti)
+        el,st = next(x.vs,st)
+        sti = start(el)
+    end
+    @assert done(x.vs,st) || !done(el,sti)
+    st,el,sti
+end
+function start(x::MultiProductVS)
+    st = start(x.vs)
+    if done(x.vs,st)
+        # there are no inner elements
+        return st,nothing,nothing
+    end
+    el,st = next(x.vs,st)
+    sti = start(el)
+    _advance(x, st,el,sti)
+end
+function next(x::MultiProductVS, state)
+    st,el,sti = state
+    @assert !done(x, state)                 # precondition
+    @assert !done(el,sti)                   # invariant
+    eli,sti = next(el,sti)
+    eli, _advance(x, st,el,sti)
+end
+function done(x::MultiProductVS, state)
+    st,el,sti = state
+    done(x.vs,st) && (el===nothing || done(el,sti))
+end
 
 
 
@@ -307,7 +336,7 @@ function start(x::PowerVS)
     st = start(x.v1)
     if done(x.v1,st)
         # there are no inner elements
-        return st,nothing,nothing
+        return st,nothing,nothing # TODO: make this type stable
     end
     el,st = next(x.v1,st)
     sti = start(el)
