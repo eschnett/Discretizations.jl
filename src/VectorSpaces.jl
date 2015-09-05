@@ -298,7 +298,7 @@ function start(x::PowerVS)
     st = start(x.v1)
     if done(x.v1,st)
         # there are no inner elements
-        st,nothing,nothing      # TODO: make this type-stable
+        return st,nothing,nothing
     end
     el,st = next(x.v1,st)
     sti = start(el)
