@@ -3,6 +3,6 @@ Tools for discretizations
 """
 module Discretizations
 
-import VectorSpaces
+include("VectorSpaces.jl")
 
 end

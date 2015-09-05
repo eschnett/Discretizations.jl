@@ -1,7 +1,7 @@
-"""
-Vector spaces
-"""
-module VectorSpaces
+# """
+# Vector spaces
+# """
+# module VectorSpaces
 
 import Base: show
 import Base: ==, isequal, hash
@@ -21,14 +21,16 @@ using Base.Test
 
 
 
-# Ensure that both types are equal, and return this type
+export typesame
+"Ensure that both types are equal, and return this type"
 function typesame{T}(T1::Type{T}, T2::Type{T})
     T1
 end
 
 
 
-# Decompose a tuple type into a tuple of types
+export tupletypes
+"Decompose a tuple type into a tuple of types"
 tupletypes{U<:Tuple}(T::Type{U}) = ntuple(d->fieldtype(T,d), nfields(T))
 
 
@@ -47,7 +49,7 @@ tupletypes{U<:Tuple}(T::Type{U}) = ntuple(d->fieldtype(T,d), nfields(T))
 # Abstract vector space definition
 
 export AbstractVS
-export veltype, vnull, vscale, vadd, vdim
+export veltype, vnewtype, vnull, vscale, vadd, vdim
 
 abstract AbstractVS{S}
 
@@ -127,6 +129,8 @@ done(x::ScalarVS, state) = state
 
 # Product of two vector spaces
 
+export ProductVS
+
 immutable ProductVS{S,V1,V2} <: AbstractVS{S}
     v1::V1
     v2::V2
@@ -183,6 +187,8 @@ end
 
 # Products with multiple factors, represented as tuples
 
+export MultiProductVS
+
 immutable MultiProductVS{S,VS} <: AbstractVS{S}
     vs::VS
     function MultiProductVS(vs)
@@ -224,6 +230,8 @@ end
 
 
 # Power of a vector space
+
+export PowerVS
 
 immutable PowerVS{S,V1,D} <: AbstractVS{S}
     v1::Array{V1,D}
@@ -308,4 +316,4 @@ function done(x::PowerVS, state)
     done(x.v1,st) && (el===nothing || done(el,sti))
 end
 
-end
+# end

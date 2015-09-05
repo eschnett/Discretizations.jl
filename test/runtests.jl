@@ -1,4 +1,4 @@
-using VectorSpaces
+using Discretizations
 using Base.Test
 
 
