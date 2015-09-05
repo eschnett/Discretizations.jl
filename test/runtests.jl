@@ -53,6 +53,8 @@ test_Scalars()
 function test_AbstractVS()
     @test_throws ErrorException veltype(AbstractVS)
     @test_throws ErrorException veltype(AbstractVS{Int})
+    @test_throws ErrorException vnewtype(AbstractVS, Float64)
+    @test_throws ErrorException vnewtype(AbstractVS{Int}, Float64)
     @test_throws ErrorException vnull(AbstractVS)
     @test_throws ErrorException vnull(AbstractVS{Int})
 end
@@ -75,6 +77,11 @@ function test_EmptyVS(S::Type)
 
     @test typeof(collect(z)) === Vector{S}
     @test collect(z) == []
+
+    @test "$z" == "VS{$S}[]"
+
+    @test done(z, start(z))
+    @test_throws BoundsError next(z, start(z))
 end
 function test_EmptyVSs()
     # test_EmptyVS(Bool)
@@ -108,6 +115,8 @@ function test_ScalarVS(S::Type)
 
     @test collect(z) == S[zero(S)]
     @test collect(e) == S[one(S)]
+
+    @test "$z" == "VS{$S}[$(zero(S))]"
 end
 function test_ScalarVSs()
     # test_ScalarVS(Bool)
