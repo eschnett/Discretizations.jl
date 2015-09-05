@@ -275,8 +275,8 @@ end
 function show{S,V1,D}(io::IO, x::PowerVS{S,V1,D})
     print(io, "VS{$S}[")
     for i in eachindex(x.v1)
-        show(io, x.v1[i])
         if i>1 print(io, ",") end
+        show(io, x.v1[i])
     end
     print(io, "]")
 end
