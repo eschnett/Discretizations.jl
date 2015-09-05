@@ -157,6 +157,8 @@ function test_ProductVS(S::Type, V1::Type, V2::Type, e1, e2)
     @test collect(z) == [collect(vnull(V1)); collect(vnull(V2))]
     @test typeof(collect(e)) === Vector{S}
     @test collect(e) == [collect(e1); collect(e2)]
+
+    @test "$z" == "VS{$S}[$(vnull(V1)),$(vnull(V2))]"
 end
 function test_ProductVSs()
     V0I = EmptyVS{Int}
@@ -266,6 +268,8 @@ function test_PowerVS(S::Type, V1::Type, D::Integer, e1)
     @test collect(e) == vcat(collect(e1),
                              repeat(collect(vnull(V1)), outer=[prod(n)-1]))
 
+    zs = "$(vnull(V1))"
+    @test "$z" == "VS{$S}[" * (zs*",")^(prod(n)-1) * zs * "]"
 end
 function test_PowerVSs()
     # test_PowerVS(Bool)
