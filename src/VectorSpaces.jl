@@ -62,9 +62,14 @@ vdim(x::AbstractVS) = error("vdim unimplemented for type $(typeof(x))")
 vscale(a, x::AbstractVS) = error("vscale unimplemented for type $(typeof(x))")
 vadd(x::AbstractVS, y::AbstractVS) =
     error("vscale unimplemented for types $(typeof(x)) and $(typeof(y))")
+# TODO: vnorm
 
+# start, next, done
 eltype{T<:AbstractVS}(V::Type{T}) = veltype(T)
 length(x::AbstractVS) = vdim(x)
+
+# TODO: map
+# TODO: mapreduce, reduce
 
 
 
