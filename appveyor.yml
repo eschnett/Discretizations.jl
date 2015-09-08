@@ -2,12 +2,18 @@ environment:
   matrix:
     # - JULIAVERSION: "x86/0.3/julia-0.3-latest-win32.exe"
     # - JULIAVERSION: "x64/0.3/julia-0.3-latest-win64.exe"
-    - JULIAVERSION: "julianightlies/bin/winnt/x86/julia-latest-win32.exe"
-    - JULIAVERSION: "julianightlies/bin/winnt/x64/julia-latest-win64.exe"
+    - JULIAVERSION: "julianightlies/bin/winnt/x86/0.4/julia-0.4.0-latest-win32.exe"
+    - JULIAVERSION: "julianightlies/bin/winnt/x64/0.4/julia-0.4.0-latest-win64.exe"
 
 branches:
   only:
     - master
+
+# notifications:
+#   - provider: Email
+#     on_build_success: false
+#     on_build_failure: false
+#     on_build_status_changed: false
 
 install:
   # if there's a newer build queued for the same PR, cancel this one
