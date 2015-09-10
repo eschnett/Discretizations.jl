@@ -9,7 +9,7 @@ notifications:
   email: false
 script:
   - if [ -e .git/shallow ]; then git fetch --unshallow; fi
-  - julia -e 'Pkg.add("https://github.com/mauro3/Traits.jl"); Pkg.build("Traits")'
+  - julia -e 'Pkg.clone("https://github.com/mauro3/Traits.jl"); Pkg.build("Traits")'
   - julia -e 'Pkg.clone(pwd()); Pkg.build("Discretizations")'
   - julia -e 'Pkg.test("Discretizations", coverage=true)'
 after_success:
