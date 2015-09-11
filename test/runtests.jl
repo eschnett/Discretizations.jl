@@ -39,6 +39,39 @@ function test_Scalar(S::Type)
     @test smul(e, z) == z
     @test smul(e, e) == e
     @test smul(smul(n, e), smul(n, e)) == e
+
+    t = sadd(e, e)
+    for a in (z,e,n,t)
+        # neutral element
+        @test sadd(a, z) == a
+        @test sadd(z, a) == a
+        # neutral element
+        @test smul(a, e) == a
+        @test smul(e, a) == a
+        # zero
+        @test smul(a, z) == z
+        @test smul(z, a) == z
+    end
+
+    for a in (z,e,n,t), b in (z,e,n,t)
+        # commutativity
+        @test smul(a, b) == smul(b, a)
+        @test sadd(a, b) == sadd(b, a)
+        # special cases
+        @test smuladd(a, b, z) == smul(a, b)
+        @test smuladd(a, e, b) == sadd(a, b)
+        @test smuladd(e, a, b) == sadd(a, b)
+    end
+
+    for a in (z,e,n,t), b in (z,e,n,t), c in (z,e,n,t)
+        # associativity
+        @test smul(smul(a, b), c) == smul(a, smul(b, c))
+        @test sadd(sadd(a, b), c) == sadd(a, sadd(b, c))
+        # distributivity
+        @test smul(sadd(a, b), c) == sadd(smul(a, c), smul(b, c))
+        # definition
+        @test smuladd(a, b, c) == sadd(smul(a, b), c)
+    end
 end
 function test_Scalars()
     test_Scalar(Bool)
@@ -85,6 +118,8 @@ function test_EmptyVS(S::Type)
     @test typeof(collect(z)) === Vector{S}
     @test collect(z) == []
 
+    @test map(smuladd, z, z, z) == z
+
     @test vdim(z) == 0
     @test vscale(S(1), z) == z
     @test vadd(z, z) == z
@@ -119,6 +154,8 @@ function test_ScalarVS(S::Type)
     array(x) = collect((x,))
     @test collect(z) == array(sconst(S, 0))
     @test collect(e) == array(sconst(S, 1))
+
+    @test map(smuladd, e, e, z) == e
 
     @test vdim(z) == 1
     @test vscale(sconst(S, 1), z) == z
@@ -172,6 +209,8 @@ function test_ProductVS{V1,V2}(::Type{V1}, ::Type{V2}, e1::V1, e2::V2)
     @test typeof(collect(e)) === Vector{S}
     @test collect(e) == [collect(e1); collect(e2)]
 
+    @test map(smuladd, e, e, z) == e
+
     @test vdim(z) == vdim(vnull(V1)) + vdim(vnull(V2))
 
     @test vscale(sconst(S, 1), z) == z
@@ -211,7 +250,7 @@ function test_ProductVSs()
     test_ProductVS(V1F, V1F, e1f, e1f)
 
     V1C = ScalarVS{Complex128}
-    e1c = V1C(1+im)
+    e1c = V1C(1)
     test_ProductVS(V1C, V1C, e1c, e1c)
 
     # TODO: Matrix{...}
@@ -246,6 +285,8 @@ function test_MultiProductVS{VS}(::Type{VS}, es::VS)
     @test collect(z) == vcat(map(collect, map(vnull, tupletypes(VS)))...)
     @test typeof(collect(e)) === Vector{S}
     @test collect(e) == vcat(map(collect, es)...)
+
+    @test map(smuladd, e, e, z) == e
 
     @test vdim(z) == sum(vdim, map(vnull, tupletypes(VS)))
 
@@ -297,14 +338,14 @@ function test_PowerVS{V1}(::Type{V1}, D::Integer, n::Tuple, e1::V1)
     @test vdim(z1) == vdim(vnull(V1))
 
     z = vnull(V, n)
-    e = V(deepcopy(z.v1))
+    e = V(deepcopy(z.vs))
     if prod(n)>0
-        e.v1[1] = e1
+        e.vs[1] = e1
     end
     if prod(n)>0
-        @test z.v1[1] == vnull(V1)
-        @test z.v1[(end+1)÷2] == vnull(V1)
-        @test z.v1[end] == vnull(V1)
+        @test z.vs[1] == vnull(V1)
+        @test z.vs[(end+1)÷2] == vnull(V1)
+        @test z.vs[end] == vnull(V1)
     end
 
     zs = "$(vnull(V1))"
@@ -324,6 +365,8 @@ function test_PowerVS{V1}(::Type{V1}, D::Integer, n::Tuple, e1::V1)
         @test collect(e) == []
     end
 
+    @test map(smuladd, e, e, z) == e
+
     @test vdim(z) == prod(n) * vdim(vnull(V1))
     @test vscale(sconst(S, 1), z) == z
     @test vadd(z, z) == z
@@ -331,19 +374,19 @@ function test_PowerVS{V1}(::Type{V1}, D::Integer, n::Tuple, e1::V1)
     @test vscale(sconst(S, 0), e) == z
     @test vscale(sconst(S, 1), e) == e
     if prod(n)>0
-        @test vscale(sconst(S, 2), e).v1[1] == vscale(sconst(S, 2), e1)
+        @test vscale(sconst(S, 2), e).vs[1] == vscale(sconst(S, 2), e1)
         if D>0
-            @test vscale(sconst(S, 2), e).v1[2] == vnull(V1)
-            @test vscale(sconst(S, 2), e).v1[end] == vnull(V1)
+            @test vscale(sconst(S, 2), e).vs[2] == vnull(V1)
+            @test vscale(sconst(S, 2), e).vs[end] == vnull(V1)
         end
     end
     @test vadd(z, e) == e
     @test vadd(e, z) == e
     if prod(n)>0
-        @test vadd(e, e).v1[1] == vadd(e1, e1)
+        @test vadd(e, e).vs[1] == vadd(e1, e1)
         if D>0
-            @test vadd(e, e).v1[2] == vnull(V1)
-            @test vadd(e, e).v1[end] == vnull(V1)
+            @test vadd(e, e).vs[2] == vnull(V1)
+            @test vadd(e, e).vs[end] == vnull(V1)
         end
     end
 end
@@ -368,6 +411,6 @@ function test_PowerVSs()
     end
 
     test_PowerVS(ScalarVS{Float64}, 1, (3,), ScalarVS{Float64}(1))
-    test_PowerVS(ScalarVS{Complex128}, 2, (3,4), ScalarVS{Complex128}(1+im))
+    test_PowerVS(ScalarVS{Complex128}, 2, (3,4), ScalarVS{Complex128}(1))
 end
 test_PowerVSs()

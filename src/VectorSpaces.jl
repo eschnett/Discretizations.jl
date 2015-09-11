@@ -8,10 +8,12 @@ using Traits
 import Base: show
 import Base: ==, isequal, hash
 import Base: start, next, done, eltype, length
+import Base: map
 
 export show
 export ==, isequal, hash
 export start, next, done, eltype, length
+export map
 
 
 
@@ -45,13 +47,15 @@ tupletypes{U<:Tuple}(T::Type{U}) = ntuple(d->fieldtype(T,d), nfields(T))
 #     one(S) -> S
 
 export AbstractScalar
-export sconst, sadd, smul
+export sconst, sadd, smul, smuladd
 
 @traitdef AbstractScalar{S} begin
     sconst(Type{S}, Integer) -> S
     sadd(S,S) -> S
     smul(S,S) -> S
 end
+
+@traitfn smuladd{S; AbstractScalar{S}}(a::S, b::S, c::S) = sadd(smul(a, b), c)
 
 sconst(::Type{Bool}, i::Integer) = Bool(abs(i)) # 0=false, +-1=true
 sadd(a::Bool, b::Bool) = a | b
@@ -88,7 +92,10 @@ export veltype, vnewtype, vdim, vnull, vscale, vadd
     vnewtype(Type{V}, Type) -> Type
     vdim(V) -> Int
 
+    # vconst(Type{V}, S) -> V
+    # vdir(Type{V}, Int) -> V
     vnull(Type{V}) -> V
+
     vscale(S, V) -> V
     vadd(V, V) -> V
 end
@@ -119,6 +126,12 @@ start(x::EmptyVS) = nothing
 next(x::EmptyVS, state) = throw(BoundsError(x))
 done(x::EmptyVS, state) = true
 eltype{S}(V::Type{EmptyVS{S}}) = veltype(V)
+
+function map{S}(f, x::EmptyVS{S}, ys::EmptyVS...)
+    TS = map(y->veltype(typeof(y)), ys)
+    R = typeof(f(sconst(S,0), map(T->sconst(T,0), TS)...))
+    EmptyVS{R}()
+end
 
 veltype{S}(::Type{EmptyVS{S}}) = S
 vnewtype{S}(::Type{EmptyVS{S}}, R::Type) = EmptyVS{R}
@@ -153,6 +166,11 @@ start(x::ScalarVS) = false
 next(x::ScalarVS, state) = (x.elt, true)
 done(x::ScalarVS, state) = state
 eltype{S}(V::Type{ScalarVS{S}}) = veltype(V)
+
+function map(f, xs::ScalarVS...)
+    r = f(map(x->x.elt, xs)...)
+    ScalarVS{typeof(r)}(r)
+end
 
 veltype{S}(V::Type{ScalarVS{S}}) = S
 vnewtype{S}(V::Type{ScalarVS{S}}, R::Type) = ScalarVS{R}
@@ -216,6 +234,18 @@ function done(x::ProductVS, state)
     done(x.v1,s1) && done(x.v2,s2)
 end
 eltype{V1,V2}(V::Type{ProductVS{V1,V2}}) = veltype(V)
+
+function map(f, x::ProductVS, ys::ProductVS...)
+    V = typeof(x)
+    S = veltype(V)
+    for y in ys
+        W = typeof(y)
+        @assert vnewtype(W, S) === V
+    end
+    r1 = map(f, x.v1, map(y->y.v1, ys)...)
+    r2 = map(f, x.v2, map(y->y.v2, ys)...)
+    ProductVS{typeof(r1), typeof(r2)}(r1, r2)
+end
 
 veltype{V1,V2}(::Type{ProductVS{V1,V2}}) = veltype(V1)
 function vnewtype{V1,V2}(::Type{ProductVS{V1,V2}}, R::Type)
@@ -310,6 +340,17 @@ function done(x::MultiProductVS, state)
 end
 eltype{VS}(V::Type{MultiProductVS{VS}}) = veltype(V)
 
+function map(f, x::MultiProductVS, ys::MultiProductVS...)
+    V = typeof(x)
+    S = veltype(V)
+    for y in ys
+        W = typeof(y)
+        @assert vnewtype(W, S) === V
+    end
+    r = ntuple(d -> map(f, x.vs[d], map(y->y.vs[d], ys)...), length(x.vs))
+    MultiProductVS{typeof(r)}(r)
+end
+
 veltype{VS}(::Type{MultiProductVS{VS}}) = veltype(fieldtype(VS,1))
 function vnewtype{VS}(::Type{MultiProductVS{VS}}, R::Type)
     RS = map(V->vnewtype(V,R), tupletypes(VS))
@@ -335,7 +376,8 @@ end
 export PowerVS
 
 immutable PowerVS{V1,D}
-    v1::Array{V1,D}
+    # TODO: Allow arbitrary array types
+    vs::Array{V1,D}
     function PowerVS(v1)
         @assert istrait(AbstractVS{V1})
         new(v1)
@@ -346,33 +388,33 @@ function show(io::IO, x::PowerVS)
     V = typeof(x)
     S = veltype(V)
     print(io, "VS{$S}[")
-    for i in eachindex(x.v1)
+    for i in eachindex(x.vs)
         if i>1 print(io, ",") end
-        show(io, x.v1[i])
+        show(io, x.vs[i])
     end
     print(io, "]")
 end
 
-=={V1,D}(x::PowerVS{V1,D}, y::PowerVS{V1,D}) = x.v1 == y.v1
-isequal{V1,D}(x::PowerVS{V1,D}, y::PowerVS{V1,D}) = isequal(x.v1, y.v1)
-hash(x::PowerVS, h::UInt) = hash(typeof(x), hash(x.v1, h))
+=={V1,D}(x::PowerVS{V1,D}, y::PowerVS{V1,D}) = x.vs == y.vs
+isequal{V1,D}(x::PowerVS{V1,D}, y::PowerVS{V1,D}) = isequal(x.vs, y.vs)
+hash(x::PowerVS, h::UInt) = hash(typeof(x), hash(x.vs, h))
 
 "advance outer iterator while inner iterator is done"
 function _advance(x::PowerVS, st,el,sti)
-    while !done(x.v1,st) && done(el,sti)
-        el,st = next(x.v1,st)
+    while !done(x.vs,st) && done(el,sti)
+        el,st = next(x.vs,st)
         sti = start(el)
     end
-    @assert done(x.v1,st) || !done(el,sti)
+    @assert done(x.vs,st) || !done(el,sti)
     st,el,sti
 end
 function start(x::PowerVS)
-    st = start(x.v1)
-    if done(x.v1,st)
+    st = start(x.vs)
+    if done(x.vs,st)
         # there are no inner elements
         return st,nothing,nothing # TODO: make this type stable
     end
-    el,st = next(x.v1,st)
+    el,st = next(x.vs,st)
     sti = start(el)
     _advance(x, st,el,sti)
 end
@@ -385,13 +427,32 @@ function next(x::PowerVS, state)
 end
 function done(x::PowerVS, state)
     st,el,sti = state
-    done(x.v1,st) && (el===nothing || done(el,sti))
+    done(x.vs,st) && (el===nothing || done(el,sti))
 end
 eltype{V1,D}(V::Type{PowerVS{V1,D}}) = veltype(V)
 
+function map(f, x::PowerVS, ys::PowerVS...)
+    V = typeof(x)
+    S = veltype(V)
+    for y in ys
+        W = typeof(y)
+        @assert vnewtype(W, S) === V
+    end
+    R = typeof(f(sconst(S,0), map(y->sconst(veltype(typeof(y)),0), ys)...))
+    V1A = typeof(x.vs)
+    V1 = eltype(V1A)
+    D = ndims(V1A)
+    W1 = vnewtype(V1, R)
+    rs = similar(x.vs, W1)
+    for i in eachindex(x.vs)
+        rs[i] = map(f, x.vs[i], map(y->y.vs[i], ys)...)
+    end
+    PowerVS{W1,D}(rs)
+end
+
 veltype{V1,D}(V::Type{PowerVS{V1,D}}) = veltype(V1)
 vnewtype{V1,D}(V::Type{PowerVS{V1,D}}, R::Type) = PowerVS{vnewtype(V1,R),D}
-vdim(x::PowerVS) = mapreduce(vdim, +, 0, x.v1)::Int
+vdim(x::PowerVS) = mapreduce(vdim, +, 0, x.vs)::Int
 
 function vnull{V1,D}(V::Type{PowerVS{V1,D}},
                      sz::NTuple{D,Integer}=ntuple(d->0,D))
@@ -405,17 +466,17 @@ function vscale(a, x::PowerVS)
     V = typeof(x)
     S = veltype(V)
     a::S
-    r = similar(x.v1)
+    r = similar(x.vs)
     @inbounds @simd for i in eachindex(r)
-        r[i] = vscale(a, x.v1[i])
+        r[i] = vscale(a, x.vs[i])
     end
     V(r)
 end
 function vadd{V1,D}(x::PowerVS{V1,D}, y::PowerVS{V1,D})
-    @assert size(x.v1) == size(y.v1)
-    r = similar(x.v1)
+    @assert size(x.vs) == size(y.vs)
+    r = similar(x.vs)
     @inbounds @simd for i in eachindex(r)
-        r[i] = vadd(x.v1[i], y.v1[i])
+        r[i] = vadd(x.vs[i], y.vs[i])
     end
     PowerVS{V1,D}(r)
 end
