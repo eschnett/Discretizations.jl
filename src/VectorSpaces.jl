@@ -96,7 +96,7 @@ end
 
 
 # TODO: This is currently broken in Traits.jl; wait for resolution
-# @traitfn eltype{V; AbstractVS{V}}(::Type{V}) = veltype(V)
+# @traitfn eltype{V; AbstractVS{V}}(dummy::Type{V}) = veltype(V)
 @traitfn length{V; AbstractVS{V}}(x::V) = vdim(x)
 
 # TODO: map
