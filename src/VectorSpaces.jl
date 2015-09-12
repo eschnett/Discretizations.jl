@@ -308,7 +308,9 @@ end
     :nothing
 end
 
-@generated function show{VS}(io::IO, x::MultiProductVS{VS})
+@generated function show(io::IO, x::MultiProductVS)
+    V = x
+    VS = getparam(V, 1)
     S = veltype(x)
     stmts = []
     push!(stmts, :(print(io, "VS{$($S)}[")))
@@ -328,7 +330,9 @@ end
 @generated function isequal{VS}(x::MultiProductVS{VS}, y::MultiProductVS{VS})
     Expr(:&&, [:(isequal(x.vs[$d], y.vs[$d])) for d in 1:nfields(VS)]...)
 end
-@generated function hash{VS}(x::MultiProductVS{VS}, h::UInt)
+@generated function hash(x::MultiProductVS, h::UInt)
+    V = x
+    VS = getparam(x, 1)
     expr = :h
     for d in 1:nfields(VS)
         expr = :(hash(x.vs[d], $expr))
@@ -368,8 +372,9 @@ function done(x::MultiProductVS, state)
 end
 eltype{VS}(V::Type{MultiProductVS{VS}}) = veltype(V)
 
-@generated function map{VS}(f, x::MultiProductVS{VS}, ys::MultiProductVS...)
+@generated function map(f, x::MultiProductVS, ys::MultiProductVS...)
     V = x
+    VS = getparam(V, 1)
     S = veltype(V)
     for y in ys
         W = y
@@ -420,10 +425,15 @@ export PowerVS
 immutable PowerVS{V1,D}
     # TODO: Allow arbitrary array types
     vs::Array{V1,D}
-    function PowerVS(v1)
-        @assert istrait(AbstractVS{V1})
-        new(v1)
+    function PowerVS(vs)
+        _check_PowerVS(V1)
+        new(vs)
     end
+end
+
+@generated function _check_PowerVS{V1}(::Type{V1})
+    @assert istrait(AbstractVS{V1})
+    :nothing
 end
 
 function show(io::IO, x::PowerVS)
@@ -473,23 +483,26 @@ function done(x::PowerVS, state)
 end
 eltype{V1,D}(::Type{PowerVS{V1,D}}) = veltype(PowerVS{V1,D})
 
-function map(f, x::PowerVS, ys::PowerVS...)
-    V = typeof(x)
+@generated function map(f, x::PowerVS, ys::PowerVS...)
+    V = x
     S = veltype(V)
     for y in ys
-        W = typeof(y)
+        W = y
         @assert vnewtype(W, S) === V
     end
-    R = typeof(f(sconst(S,0), map(y->sconst(veltype(typeof(y)),0), ys)...))
-    V1A = typeof(x.vs)
-    V1 = eltype(V1A)
-    D = ndims(V1A)
-    W1 = vnewtype(V1, R)
-    rs = similar(x.vs, W1)
-    for i in eachindex(x.vs)
-        rs[i] = map(f, x.vs[i], map(y->y.vs[i], ys)...)
+    V1 = getparam(V, 1)::Type
+    D = getparam(V, 2)::Integer
+    quote
+        R = typeof($(Expr(:call, :f, :(sconst($S,0)),
+                          [:(sconst(veltype($y),0)) for y in ys]...)))
+        W1 = vnewtype($V1, R)
+        rs = similar(x.vs, W1)
+        @inbounds @simd for i in eachindex(x.vs)
+            rs[i] = $(Expr(:call, :map, :f, :(x.vs[i]),
+                           [:(ys[$d].vs[i]) for d in 1:nfields(ys)]...))
+        end
+        PowerVS{W1,$D}(rs)
     end
-    PowerVS{W1,D}(rs)
 end
 
 veltype{V1,D}(::Type{PowerVS{V1,D}}) = veltype(V1)
