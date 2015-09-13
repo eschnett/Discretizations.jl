@@ -1,3 +1,5 @@
+__precompile__()
+
 """
 Tools for discretizations
 """
