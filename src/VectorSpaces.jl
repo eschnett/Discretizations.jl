@@ -123,7 +123,17 @@ end
 
 export EmptyVS
 
-immutable EmptyVS{S} end
+immutable EmptyVS{S}
+    function EmptyVS()
+        _check_EmptyVS(S)
+        new()
+    end
+end
+
+@generated function _check_EmptyVS{S}(::Type{S})
+    @assert istrait(AbstractScalar{S})
+    :nothing
+end
 
 function show(io::IO, x::EmptyVS)
     S = veltype(typeof(x))
@@ -159,7 +169,15 @@ export ScalarVS
 
 immutable ScalarVS{S}
     elt::S
-    ScalarVS(elt) = new(elt)
+    function ScalarVS(elt)
+        _check_ScalarVS(S)
+        new(elt)
+    end
+end
+
+@generated function _check_ScalarVS{S}(::Type{S})
+    @assert istrait(AbstractScalar{S})
+    :nothing
 end
 
 function show(io::IO, x::ScalarVS)
@@ -207,11 +225,16 @@ immutable ProductVS{V1,V2}
     v1::V1
     v2::V2
     function ProductVS(v1, v2)
-        @assert istrait(AbstractVS{V1})
-        @assert istrait(AbstractVS{V2})
-        @assert veltype(V1) === veltype(V2)
+        _check_ProductVS(V1, V2)
         new(v1, v2)
     end
+end
+
+@generated function _check_ProductVS{V1,V2}(::Type{V1}, ::Type{V2})
+    @assert istrait(AbstractVS{V1})
+    @assert istrait(AbstractVS{V2})
+    @assert veltype(V1) === veltype(V2)
+    :nothing
 end
 
 function show(io::IO, x::ProductVS)
@@ -521,19 +544,22 @@ function vscale(a, x::PowerVS)
     V = typeof(x)
     S = veltype(V)
     a::S
-    r = similar(x.vs)
-    @inbounds @simd for i in eachindex(r)
-        r[i] = vscale(a, x.vs[i])
+    xs = x.vs
+    rs = similar(xs)
+    @inbounds @simd for i in eachindex(rs)
+        rs[i] = vscale(a, xs[i])
     end
-    V(r)
+    V(rs)
 end
 function vadd{V1,D}(x::PowerVS{V1,D}, y::PowerVS{V1,D})
-    @assert size(x.vs) == size(y.vs)
-    r = similar(x.vs)
-    @inbounds @simd for i in eachindex(r)
-        r[i] = vadd(x.vs[i], y.vs[i])
+    xs = x.vs
+    ys = y.vs
+    @assert size(xs) == size(ys)
+    rs = similar(xs)
+    @inbounds @simd for i in eachindex(rs)
+        rs[i] = vadd(xs[i], ys[i])
     end
-    PowerVS{V1,D}(r)
+    PowerVS{V1,D}(rs)
 end
 
 # end
