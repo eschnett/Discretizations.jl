@@ -163,11 +163,11 @@ next(x::EmptyVS, state) = throw(BoundsError(x))
 done(x::EmptyVS, state) = true
 eltype{S}(::Type{EmptyVS{S}}) = veltype(EmptyVS{S})
 
-@generated function map{S}(f, x::EmptyVS{S}, ys::EmptyVS...)
+@generated function map(f, x::EmptyVS, ys::EmptyVS...)
+    S = veltype(x)
     TS = map(veltype, ys)
-    fcall = Expr(:call, :f, sconst(S,0), map(T->sconst(T,0), TS)...)
     quote
-        R = typeof($fcall)
+        R = typeof(f($(sconst(S,0)), $([sconst(T,0) for T in TS]...)))
         EmptyVS{R}()
     end
 end
@@ -216,8 +216,7 @@ eltype{S}(::Type{ScalarVS{S}}) = veltype(ScalarVS{S})
 
 @generated function map(f, x::ScalarVS, ys::ScalarVS...)
     quote
-        r = $(Expr(:call,
-                   :f, :(x.elt), [:(ys[$d].elt) for d in 1:length(ys)]...))
+        r = f(x.elt, $([:(ys[$d].elt) for d in 1:length(ys)]...))
         ScalarVS{typeof(r)}(r)
     end
 end
@@ -298,10 +297,8 @@ eltype{V1,V2}(::Type{ProductVS{V1,V2}}) = veltype(ProductVS{V1,V2})
         @assert vnewtype(W, S) === V
     end
     quote
-        r1 = $(Expr(:call,
-                    :map, :f, :(x.v1), [:(ys[$d].v1) for d in 1:length(ys)]...))
-        r2 = $(Expr(:call,
-                    :map, :f, :(x.v2), [:(ys[$d].v2) for d in 1:length(ys)]...))
+        r1 = map(f, x.v1, $([:(ys[$d].v1) for d in 1:length(ys)]...))
+        r2 = map(f, x.v2, $([:(ys[$d].v2) for d in 1:length(ys)]...))
         ProductVS{typeof(r1), typeof(r2)}(r1, r2)
     end
 end
@@ -392,10 +389,10 @@ function _advance(x::MultiProductVS, st,el,sti)
 end
 function start(x::MultiProductVS)
     st = start(x.vs)
-    if done(x.vs,st)
-        # there are no inner elements
-        return st,nothing,nothing
-    end
+    @assert !done(x.vs,st)
+    # if done(x.vs,st)
+    #     return st,nothing,nothing
+    # end
     el,st = next(x.vs,st)
     sti = start(el)
     _advance(x, st,el,sti)
@@ -409,7 +406,9 @@ function next(x::MultiProductVS, state)
 end
 function done(x::MultiProductVS, state)
     st,el,sti = state
-    done(x.vs,st) && (el===nothing || done(el,sti))
+    # done(x.vs,st) && (el===nothing || done(el,sti))
+    @assert el!==nothing
+    done(x.vs,st) && done(el,sti)
 end
 eltype{VS}(V::Type{MultiProductVS{VS}}) = veltype(V)
 
@@ -422,10 +421,9 @@ eltype{VS}(V::Type{MultiProductVS{VS}}) = veltype(V)
         @assert vnewtype(W, S) === V
     end
     quote
-        r = $(Expr(:call, :tuple,
-                   [:($(Expr(:call, :map, :f, :(x.vs[$d]),
-                             [:(ys[$i].vs[$d]) for i in 1:nfields(ys)]...)))
-                    for d in 1:length(VS)]...))
+        r = tuple($([:(map(f, x.vs[$d],
+                           $([:(ys[$i].vs[$d]) for i in 1:nfields(ys)]...)))
+                     for d in 1:length(VS)]...))
         MultiProductVS{typeof(r)}(r)
     end
 end
@@ -436,25 +434,31 @@ function vnewtype{VS,R}(::Type{MultiProductVS{VS}}, ::Type{R})
     V = MultiProductVS{Tuple{RS...}}
 end
 @generated function vdim{VS}(x::MultiProductVS{VS})
-    Expr(:call, :+, [:(vdim(x.vs[$d])) for d in 1:nfields(VS)]...)
+    quote
+        +($([:(vdim(x.vs[$d])) for d in 1:nfields(VS)]...))
+    end
 end
 
 @generated function vnull{VS}(::Type{MultiProductVS{VS}})
-    expr = Expr(:call, :tuple, map(T->:(vnull($T)), tupletypes(VS))...)
-    :(MultiProductVS{$VS}($expr))
+    quote
+        rs = tuple($(map(T->:(vnull($T)), tupletypes(VS))...))
+        MultiProductVS{$VS}(rs)
+    end
 end
 @generated function vscale{VS}(a, x::MultiProductVS{VS})
     V = x
     S = veltype(V)
     @assert a === S
-    expr = Expr(:call, :tuple,
-                [:(vscale(a, x.vs[$d])) for d in 1:nfields(VS)]...)
-    :(MultiProductVS{$VS}($expr))
+    quote
+        rs = tuple($([:(vscale(a, x.vs[$d])) for d in 1:nfields(VS)]...))
+        MultiProductVS{$VS}(rs)
+    end
 end
 @generated function vadd{VS}(x::MultiProductVS{VS}, y::MultiProductVS{VS})
-    expr = Expr(:call, :tuple,
-                [:(vadd(x.vs[$d], y.vs[$d])) for d in 1:nfields(VS)]...)
-    :(MultiProductVS{$VS}($expr))
+    quote
+        rs = tuple($([:(vadd(x.vs[$d], y.vs[$d])) for d in 1:nfields(VS)]...))
+        MultiProductVS{$VS}(rs)
+    end
 end
 
 
@@ -527,20 +531,21 @@ eltype{V1,D}(::Type{PowerVS{V1,D}}) = veltype(PowerVS{V1,D})
 @generated function map(f, x::PowerVS, ys::PowerVS...)
     V = x
     S = veltype(V)
-    for y in ys
-        W = y
+    WS = ys
+    for W in WS
         @assert vnewtype(W, S) === V
     end
+    TS = map(veltype, WS)
     V1 = getparam(V, 1)::Type
     D = getparam(V, 2)::Integer
     quote
-        R = typeof($(Expr(:call, :f, :(sconst($S,0)),
-                          [:(sconst(veltype($y),0)) for y in ys]...)))
+        R = typeof(f($(sconst(S,0)),
+                     $([sconst(veltype(T),0) for T in TS]...)))
         W1 = vnewtype($V1, R)
         rs = similar(x.vs, W1)
         @inbounds @simd for i in eachindex(x.vs)
-            rs[i] = $(Expr(:call, :map, :f, :(x.vs[i]),
-                           [:(ys[$d].vs[i]) for d in 1:nfields(ys)]...))
+            rs[i] = map(f, x.vs[i],
+                        $([:(ys[$d].vs[i]) for d in 1:nfields(ys)]...))
         end
         PowerVS{W1,$D}(rs)
     end
