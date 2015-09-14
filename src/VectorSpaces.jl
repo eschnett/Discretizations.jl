@@ -37,14 +37,6 @@ tupletypes{T<:Tuple}(::Type{T}) = ntuple(d->fieldtype(T,d), nfields(T))
 
 
 
-export nparams, getparam
-"Number of type parameters"
-nparams{T}(::Type{T}) = length(T.parameters)
-"Get type parameters"
-getparam{T}(::Type{T}, i::Integer) = T.parameters[i]
-
-
-
 # Scalars must support these operations:
 #     +(S) -> S
 #     -(S) -> S
@@ -346,9 +338,11 @@ end
     :nothing
 end
 
+_get_types{VS}(::Type{MultiProductVS{VS}}) = VS
+
 @generated function show(io::IO, x::MultiProductVS)
     V = x
-    VS = getparam(V, 1)
+    VS = _get_types(V)
     S = veltype(x)
     stmts = []
     push!(stmts, :(print(io, "VS{$($S)}[")))
@@ -370,7 +364,7 @@ end
 end
 @generated function hash(x::MultiProductVS, h::UInt)
     V = x
-    VS = getparam(x, 1)
+    VS = _get_types(x)
     expr = :h
     for d in 1:nfields(VS)
         expr = :(hash(x.vs[d], $expr))
@@ -414,7 +408,7 @@ eltype{VS}(V::Type{MultiProductVS{VS}}) = veltype(V)
 
 @generated function map(f, x::MultiProductVS, ys::MultiProductVS...)
     V = x
-    VS = getparam(V, 1)
+    VS = _get_types(V)
     S = veltype(V)
     for y in ys
         W = y
@@ -481,6 +475,9 @@ end
     :nothing
 end
 
+_get_eltype{V1,D}(::Type{PowerVS{V1,D}}) = V1
+_get_ndims{V1,D}(::Type{PowerVS{V1,D}}) = D
+
 function show(io::IO, x::PowerVS)
     V = typeof(x)
     S = veltype(V)
@@ -536,8 +533,8 @@ eltype{V1,D}(::Type{PowerVS{V1,D}}) = veltype(PowerVS{V1,D})
         @assert vnewtype(W, S) === V
     end
     TS = map(veltype, WS)
-    V1 = getparam(V, 1)::Type
-    D = getparam(V, 2)::Integer
+    V1 = _get_eltype(V)
+    D = _get_ndims(V)
     quote
         R = typeof(f($(sconst(S,0)),
                      $([sconst(veltype(T),0) for T in TS]...)))
