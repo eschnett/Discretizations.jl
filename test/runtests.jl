@@ -4,13 +4,6 @@ using Base.Test
 
 
 
-# typesame
-@test typesame(Int,Int) === Int
-@test_throws MethodError typesame(Int,Float64)
-@test_throws MethodError typesame(Float64,Int)
-@test_throws MethodError typesame(Integer,Int)
-@test_throws MethodError typesame(Int,Integer)
-
 # tupletypes
 @test tupletypes(Tuple{}) === ()
 @test tupletypes(Tuple{Int}) === (Int,)

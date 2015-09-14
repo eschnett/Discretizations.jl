@@ -23,14 +23,6 @@ export map
 
 
 
-export typesame
-"Ensure that both types are equal, and return this type"
-function typesame{T}(T1::Type{T}, T2::Type{T})
-    T1
-end
-
-
-
 export tupletypes
 "Decompose a tuple type into a tuple of types"
 tupletypes{T<:Tuple}(::Type{T}) = ntuple(d->fieldtype(T,d), nfields(T))
