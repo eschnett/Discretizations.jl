@@ -103,7 +103,7 @@ export veltype, vnewtype, vdim, vnull, vscale, vadd
     # vconst(Type{V}, S) -> V
     # vdir(Type{V}, Int) -> V
     vnull(Type{V}) -> V
-
+    
     vscale(S, V) -> V
     vadd(V, V) -> V
 end
@@ -116,6 +116,24 @@ end
 
 # TODO: map
 # TODO: mapreduce, reduce
+
+
+
+# Scalars as vector space
+
+_svtypes = [Bool,
+            Int8, Int16, Int32, Int64, Int128,
+            Float16, Float32, Float64,
+            Complex32, Complex64, Complex128]
+ScalarVector = Union{_svtypes..., [Matrix{T} for T in _svtypes]...}
+
+veltype{S<:ScalarVector}(::Type{S}) = S
+# vnewtype{S<:ScalarVector,R}(::Type{S}, ::Type{R}) = R
+vnewtype{S<:ScalarVector,R}(::Type{S}, R0::Type{R}) = R0
+vdim(x::ScalarVector) = 1
+vnull{S<:ScalarVector}(::Type{S}) = sconst(S, 0)
+vscale{S<:ScalarVector}(a::S, x::S) = smul(a, x)
+vadd{S<:ScalarVector}(x::S, y::S) = sadd(x, y)
 
 
 

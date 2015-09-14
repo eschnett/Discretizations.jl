@@ -95,6 +95,56 @@ test_AbstractVS()
 
 
 
+# Scalars as vector space
+
+function test_ScalarVector(V::Type)
+    S = V
+    @test istrait(AbstractScalar{S})
+    @test istrait(AbstractVS{S})
+
+    @test veltype(V) === S
+    @test veltype(vnewtype(V, Int)) === Int
+
+    z = vnull(V)
+    e = V(sconst(S, 1))
+    @test z == sconst(S, 0)
+    @test e == sconst(S, 1)
+
+    @test "$z" == "$(sconst(S, 0))"
+
+    @test collect(z) == collect(sconst(S, 0))
+    @test collect(e) == collect(sconst(S, 1))
+
+    @test map(smuladd, e, e, z) == e
+
+    @test vdim(z) == 1
+    @test vscale(sconst(S, 1), z) == z
+    @test vadd(z, z) == z
+    @test vscale(sconst(S, 0), e) == z
+    @test vscale(sconst(S, 1), e) == e
+    if S ∉ (Bool, Matrix{Bool})
+        @test vscale(sconst(S, 2), e) == sconst(S, 2)
+    end
+    @test vadd(z, e) == e
+    @test vadd(e, z) == e
+    if S ∉ (Bool, Matrix{Bool})
+        @test vadd(e, e) == sconst(S, 2)
+    end
+end
+function test_ScalarVectors()
+    test_ScalarVector(Bool)
+    test_ScalarVector(Int)
+    test_ScalarVector(Float64)
+    test_ScalarVector(Complex128)
+    test_ScalarVector(Matrix{Bool})
+    test_ScalarVector(Matrix{Int})
+    test_ScalarVector(Matrix{Float64})
+    test_ScalarVector(Matrix{Complex128})
+end
+test_ScalarVectors()
+
+
+
 # EmptyVS
 
 function test_EmptyVS(S::Type)
