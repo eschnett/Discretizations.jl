@@ -82,6 +82,7 @@ export veltype, vnewtype, vdim, vnull, vscale, vadd
 
     veltype(Type{V}) -> Type{S}
     vnewtype{R}(Type{V}, Type{R}) -> Type
+    vdim(Type{V}) -> Int
     vdim(V) -> Int
 
     # vconst(Type{V}, S) -> V
@@ -114,7 +115,8 @@ ScalarVector = Union{_svtypes..., [Matrix{T} for T in _svtypes]...}
 veltype{S<:ScalarVector}(::Type{S}) = S
 # vnewtype{S<:ScalarVector,R}(::Type{S}, ::Type{R}) = R
 vnewtype{S<:ScalarVector,R}(::Type{S}, R0::Type{R}) = R0
-vdim(x::ScalarVector) = 1
+vdim{S<:ScalarVector}(::Type{S}) = 1
+vdim(x::ScalarVector) = vdim(typeof(x))
 vnull{S<:ScalarVector}(::Type{S}) = sconst(S, 0)
 vscale{S<:ScalarVector}(a::S, x::S) = smul(a, x)
 vadd{S<:ScalarVector}(x::S, y::S) = sadd(x, y)
@@ -158,7 +160,8 @@ end
 
 veltype{S}(::Type{EmptyVS{S}}) = S
 vnewtype{S,R}(::Type{EmptyVS{S}}, ::Type{R}) = EmptyVS{R}
-vdim(x::EmptyVS) = 0
+vdim{S}(::Type{EmptyVS{S}}) = 0
+vdim(x::EmptyVS) = vdim(typeof(x))
 vnull{S}(::Type{EmptyVS{S}}) = EmptyVS{S}()
 vscale{S}(a::S, x::EmptyVS{S}) = EmptyVS{S}()
 vadd{S}(x::EmptyVS{S}, y::EmptyVS{S}) = EmptyVS{S}()
@@ -207,7 +210,8 @@ end
 
 veltype{S}(::Type{ScalarVS{S}}) = S
 vnewtype{S,R}(::Type{ScalarVS{S}}, ::Type{R}) = ScalarVS{R}
-vdim(x::ScalarVS) = 1
+vdim{S}(::Type{ScalarVS{S}}) = 1
+vdim(x::ScalarVS) = vdim(typeof(x))
 vnull{S}(::Type{ScalarVS{S}}) = ScalarVS{S}(sconst(S, 0))
 vscale{S}(a::S, x::ScalarVS{S}) = ScalarVS{S}(smul(a, x.elt))
 vadd{S}(x::ScalarVS{S}, y::ScalarVS{S}) = ScalarVS{S}(sadd(x.elt, y.elt))
@@ -290,6 +294,11 @@ end
 veltype{V1,V2}(::Type{ProductVS{V1,V2}}) = veltype(V1)
 function vnewtype{V1,V2,R}(::Type{ProductVS{V1,V2}}, ::Type{R})
     ProductVS{vnewtype(V1,R), vnewtype(V2,R)}
+end
+function vdim{V1,V2}(::Type{ProductVS{V1,V2}})
+    # TODO: improve performance
+    if vdim(V1)<0 || vdim(V2)<0 return -1 end
+    return vdim(V1) + vdim(V2)
 end
 vdim(x::ProductVS) = vdim(x.v1) + vdim(x.v2)
 
@@ -419,6 +428,11 @@ function vnewtype{VS,R}(::Type{MultiProductVS{VS}}, ::Type{R})
     RS = map(V->vnewtype(V,R), tupletypes(VS))
     V = MultiProductVS{Tuple{RS...}}
 end
+function vdim{VS}(::Type{MultiProductVS{VS}})
+    # TODO: improve performance
+    if any(collect(map(vdim, tupletypes(VS))) .< 0) return -1 end
+    sum(map(vdim, tupletypes(VS)))::Int
+end
 @generated function vdim{VS}(x::MultiProductVS{VS})
     quote
         +($([:(vdim(x.vs[$d])) for d in 1:nfields(VS)]...))
@@ -542,6 +556,13 @@ end
 
 veltype{V1,D}(::Type{PowerVS{V1,D}}) = veltype(V1)
 vnewtype{V1,D,R}(::Type{PowerVS{V1,D}}, ::Type{R}) = PowerVS{vnewtype(V1,R),D}
+function vdim{V1,D}(::Type{PowerVS{V1,D}})
+    # TODO: Once arbitrary array types are allowed, handle case where
+    # array length is fixed
+    if D==0 return vdim(V1) end
+    if vdim(V1)==0 return 0 end
+    -1
+end
 vdim(x::PowerVS) = mapreduce(vdim, +, 0, x.vs)::Int
 
 function vnull{V1,D}(::Type{PowerVS{V1,D}},
