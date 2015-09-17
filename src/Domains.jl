@@ -1,12 +1,10 @@
-__precompile__()
-
 """
 Domains
 """
 module Domains
 
 using Traits
-using VectorSpaces
+using ..VectorSpaces
 
 import Base: show
 import Base: eltype, ndims
@@ -156,7 +154,5 @@ vspace{V}(::Type{BoxDomain{V}}) = V
 isempty{V}(d::BoxDomain{V}) = isempty(d.shape)::Bool
 in{V}(p::V, d::BoxDomain{V}) = (p in d.shape)::Bool
 boundingbox{V}(d::BoxDomain{V}) = d.shape::Region{V}
-
-
 
 end

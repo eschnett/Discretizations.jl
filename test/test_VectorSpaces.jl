@@ -1,5 +1,3 @@
-using VectorSpaces
-using Base.Test
 using Traits
 
 
