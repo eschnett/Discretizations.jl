@@ -6,11 +6,13 @@
 using Traits
 
 import Base: show
+import Base: mod
 import Base: ==, isequal, hash
 import Base: start, next, done, eltype, length
 import Base: map
 
 export show
+export mod
 export ==, isequal, hash
 export start, next, done, eltype, length
 export map
@@ -29,8 +31,6 @@ tupletypes{T<:Tuple}(::Type{T}) = ntuple(d->fieldtype(T,d), nfields(T))
 
 
 
-import Base: mod
-export mod
 function mod{T<:Integer}(i::Rational{T}, ::Type{Rational{Bool}})
     mod(num(i), Bool) // Bool(den(i))
 end
