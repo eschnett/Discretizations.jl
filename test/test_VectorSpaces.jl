@@ -1,3 +1,9 @@
+using VectorSpaces
+using Base.Test
+using Traits
+
+
+
 # tupletypes
 @test tupletypes(Tuple{}) === ()
 @test tupletypes(Tuple{Int}) === (Int,)

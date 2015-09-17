@@ -1,6 +1,3 @@
-using Discretizations
-using Traits
-using Base.Test
-
-include("VectorSpaces.jl")
-include("Domains.jl")
+push!(LOAD_PATH, "../src")
+include("test_VectorSpaces.jl")
+include("test_Domains.jl")

@@ -1,7 +1,9 @@
-# """
-# Vector spaces
-# """
-# module VectorSpaces
+__precompile__()
+
+"""
+Vector spaces
+"""
+module VectorSpaces
 
 using Traits
 
@@ -625,4 +627,4 @@ function vadd{V1,D}(x::PowerVS{V1,D}, y::PowerVS{V1,D})
     PowerVS{V1,D}(rs)
 end
 
-# end
+end

@@ -1,3 +1,9 @@
+using Domains
+using Base.Test
+using Traits
+
+
+
 function test_Region{V}(::Type{V})
     @test istrait(AbstractVS{V})
     Reg = Region{V}

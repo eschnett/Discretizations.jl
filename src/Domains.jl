@@ -1,9 +1,12 @@
-# """
-# Domains
-# """
-# module Domains
+__precompile__()
+
+"""
+Domains
+"""
+module Domains
 
 using Traits
+using VectorSpaces
 
 import Base: show
 import Base: eltype, ndims
@@ -156,4 +159,4 @@ boundingbox{V}(d::BoxDomain{V}) = d.shape::Region{V}
 
 
 
-# end
+end
