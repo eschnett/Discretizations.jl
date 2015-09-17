@@ -29,6 +29,14 @@ tupletypes{T<:Tuple}(::Type{T}) = ntuple(d->fieldtype(T,d), nfields(T))
 
 
 
+import Base: mod
+export mod
+function mod{T<:Integer}(i::Rational{T}, ::Type{Rational{Bool}})
+    mod(num(i), Bool) // Bool(den(i))
+end
+
+
+
 # Scalars must support these operations:
 #     +(S) -> S
 #     -(S) -> S
@@ -53,6 +61,14 @@ sconst(::Type{Bool}, i::Integer) = Bool(abs(i)) # 0=false, +-1=true
 sadd(a::Bool, b::Bool) = a | b
 smul(a::Bool, b::Bool) = a & b
 
+sconst(::Type{Rational{Bool}}, i::Integer) = Rational{Bool}(abs(i))
+function sadd(a::Rational{Bool}, b::Rational{Bool})
+    mod(sadd(Rational{Int}(a), Rational{Int}(b)), Rational{Bool})
+end
+function smul(a::Rational{Bool}, b::Rational{Bool})
+    mod(smul(Rational{Int}(a), Rational{Int}(b)), Rational{Bool})
+end
+
 sconst{S<:Number}(::Type{S}, i::Integer) = S(i)
 sadd{S<:Number}(a::S, b::S) = a + b
 smul{S<:Number}(a::S, b::S) = a * b
@@ -60,6 +76,18 @@ smul{S<:Number}(a::S, b::S) = a * b
 sconst(::Type{Matrix{Bool}}, i::Integer) = diagm(sconst(Bool, i))
 sadd(a::Matrix{Bool}, b::Matrix{Bool}) = a | b
 smul(a::Matrix{Bool}, b::Matrix{Bool}) = Matrix{Bool}(a * b)
+
+function sconst(::Type{Matrix{Rational{Bool}}}, i::Integer)
+    diagm(sconst(Rational{Bool}, i))
+end
+function sadd(a::Matrix{Rational{Bool}}, b::Matrix{Rational{Bool}})
+    RB, RI = Rational{Bool}, Rational{Int}
+    map(i->mod(i, RB), sadd(Matrix{RI}(a), Matrix{RI}(b)))::Matrix{RB}
+end
+function smul(a::Matrix{Rational{Bool}}, b::Matrix{Rational{Bool}})
+    RB, RI = Rational{Bool}, Rational{Int}
+    map(i->mod(i, RB), smul(Matrix{RI}(a), Matrix{RI}(b)))::Matrix{RB}
+end
 
 sconst{S<:Number}(::Type{Matrix{S}}, i::Integer) = diagm(sconst(S, i))
 sadd{S<:Number}(a::Matrix{S}, b::Matrix{S}) = a + b
@@ -107,9 +135,11 @@ end
 # Scalars as vector space
 
 _svtypes = [Bool,
-            Int8, Int16, Int32, Int64, Int128,
-            Float16, Float32, Float64,
-            Complex32, Complex64, Complex128]
+            Int8, Int16, Int32, Int64, Int128, BigInt,
+            Rational{Int8}, Rational{Int16}, Rational{Int32}, Rational{Int64},
+            Rational{Int128}, Rational{BigInt},
+            Float16, Float32, Float64, BigFloat,
+            Complex32, Complex64, Complex128, Complex{BigFloat}]
 ScalarVector = Union{_svtypes..., [Matrix{T} for T in _svtypes]...}
 
 veltype{S<:ScalarVector}(::Type{S}) = S
