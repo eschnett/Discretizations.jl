@@ -5,17 +5,22 @@
 
 using Traits
 
+import Base: show
 import Base: eltype, ndims
-import Base: isempty, in, intersect, issubset
+import Base: isempty, in, ==, <, issubset, ⊊
+import Base: intersect, issubset
 
+export show
 export eltype, ndims
-export isempty, in, intersect, issubset
+export isempty, in, ==, <, issubset, ⊊
+export intersect, issubset
 
 
 
 export Region
-export boundingbox
+export vspace, boundingbox
 
+# TODO: Use Range?
 immutable Region{V}
     min::V
     max::V
@@ -24,86 +29,130 @@ immutable Region{V}
         @assert vdim(min) == vdim(max) == vdim(V)
         new(min, max)
     end
-    Region() = Region{T,D}(vnull(V), vnull(V))
+    Region() = Region{V}(vnull(V), vnull(V))
 end
 
 @generated function _check_Region{V}(::Type{V})
-    @assert istrait(AbstractVector{V})
-    vdim(V)
+    @assert istrait(AbstractVS{V})
+    @assert vdim(V)>=0
+    S = veltype(V)
+    @assert sconst(S,0) < sconst(S,1) # must support comparison
     :nothing
 end
 
-eltype{V}(::Type{Region{V}}) = eltype(V)
-ndims{V}(::Type{Region{V}}) = length(V)
+function show{V}(io::IO, r::Region{V})
+    show(io, "Region{$V}($(r.min):$(r.max))")
+end
 
-isempty(r::Region) = any(r.max .<= r.min)
-in{V}(p::V, r::Region{V}) = all(p .>= r.min) && all(p .< r.max)
+vspace{V}(::Type{Region{V}}) = V
+
+isempty(r::Region) = any(map(<=, r.max, r.min))
+in{V}(p::V, r::Region{V}) = all(map(>=, p, r.min)) && all(map(<, p, r.max))
+
+function =={V}(r1::Region{V}, r2::Region{V})
+    if isempty(r1) && isempty(r2) return true end
+    if isempty(r1) || isempty(r2) return false end
+    all(map(==, r1.min, r2.min)) && all(map(==, r1.max, r2.max))
+end
+function <{V}(r1::Region{V}, r2::Region{V})
+    if isempty(r1) return true end
+    if isempty(r2) return false end
+    if r1==r2 return false end
+    all(map(>=, r1.min, r2.min)) && all(map(<=, r1.max, r2.max))
+end
+issubset{V}(r1::Region{V}, r2::Region{V}) = r1 <= r2
+⊊{V}(r1::Region{V}, r2::Region{V}) = r1 < r2
+
+# TODO: isless, hash
 
 intersect(r::Region) = r
 function intersect{V}(r1::Region{V}, r2::Region{V})
     # if isempty(r1) || isempty(r2) return false end
     Region{V}(map(max, r1.min, r2.min), map(min, r1.max, r2.max))
 end
-function issubset{V}(r1::Region{V}, r2::Region{V})
-    if isempty(r1) return true end
-    # if isempty(r2) return false end
-    all(r1.min .>= r2.min) && all(r1.max .<= r2.max)
-end
+
 function boundingbox{V}(r1::Region{V}, r2::Region{V})
     # if isempty(r1) && isempty(r2) return Region{V}() end
-    if isempty(r2) return r1 end
     if isempty(r1) return r2 end
-    Region{V}(map(max, r1.min, r2.min), map(min, r1.max, r2.max))
+    if isempty(r2) return r1 end
+    Region{V}(map(min, r1.min, r2.min), map(max, r1.max, r2.max))
 end
 
-# union
-# setdiff
+# TODO: union, setdiff
 
 
 
-# export Domain
-# 
-# @traitdef Domain{Dom} begin
-#     T = eltype(Dom)
-#     D = ndims(Dom)
-#     eltype(Type{Dom}) -> Type
-#     ndims(Type{Dom}) -> Int
-#     isempty(Dom) -> Bool
-#     in(Point{T,D}, Dom) -> Bool
-#     boundingbox(Dom) -> Region{T,D}
-# end
-# 
-# 
-# 
-# # Empty Domain
-# 
-# export EmptyDomain
-# 
-# immutable EmptyDomain{T,D} end
-# 
-# eltype{T,D}(::Type{EmptyDomain{T,D}}) = T
-# ndims{T,D}(::Type{EmptyDomain{T,D}}) = D
-# 
-# isempty{T,D}(d::EmptyDomain{T,D}) = true
-# in{T,D}(p::Point{T,D}, d::EmptyDomain{T,D}) = false
-# boundingbox{T,D}(d::EmptyDomain{T,D}) = Region{T,D}()
-# 
-# 
-# 
-# # Cuboid Domain
-# 
-# export BoxDomain
-# 
-# immutable BoxDomain{T,D}
-#     shape::Region{T,D}
-# end
-# 
-# eltype{T,D}(::Type{BoxDomain{T,D}}) = T
-# ndims{T,D}(::Type{BoxDomain{T,D}}) = D
-# 
-# isempty{T,D}(d::BoxDomain{T,D}) = isempty(d.shape) #TODO ::Bool
-# in{T,D}(p::Point{T,D}, d::BoxDomain{T,D}) = p in d.shape
-# boundingbox{T,D}(d::BoxDomain{T,D}) = d.shape
+export AbstractDomain
+export vspace, boundingbox
+
+@traitdef AbstractDomain{Dom} begin
+    V = vspace(Dom)
+    @constraints begin
+        istrait(AbstractVS{V})
+    end
+    isempty(Dom) -> Bool
+    in(V, Dom) -> Bool
+    boundingbox(Dom) -> Region{V}
+end
+
+
+
+# Empty Domain
+
+export EmptyDomain
+
+immutable EmptyDomain{V}
+    function EmptyDomain()
+        _check_EmptyDomain(V)
+        new()
+    end
+end
+
+@generated function _check_EmptyDomain{V}(::Type{V})
+    @assert istrait(AbstractVS{V})
+    @assert vdim(V)>=0
+    :nothing
+end
+
+function show{V}(io::IO, d::EmptyDomain{V})
+    show(io, "Domain{$V}[]")
+end
+
+vspace{V}(::Type{EmptyDomain{V}}) = V
+
+isempty{V}(d::EmptyDomain{V}) = true
+in{V}(p::V, d::EmptyDomain{V}) = false
+boundingbox{V}(d::EmptyDomain{V}) = Region{V}()::Region{V}
+
+
+
+# Cuboid Domain
+
+export BoxDomain
+
+immutable BoxDomain{V}
+    shape::Region{V}
+    function BoxDomain(shape)
+        _check_BoxDomain(V)
+        new(shape)
+    end
+end
+
+@generated function _check_BoxDomain{V}(::Type{V})
+    @assert istrait(AbstractVS{V})
+    @assert vdim(V)>=0
+    :nothing
+end
+
+function show{V}(io::IO, d::BoxDomain{V})
+    show(io, "Domain{$V}[$(d.shape)]")
+end
+
+vspace{V}(::Type{BoxDomain{V}}) = V
+
+isempty{V}(d::BoxDomain{V}) = isempty(d.shape)::Bool
+in{V}(p::V, d::BoxDomain{V}) = (p in d.shape)::Bool
+boundingbox{V}(d::BoxDomain{V}) = d.shape::Region{V}
 
 
 
