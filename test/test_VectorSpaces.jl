@@ -13,17 +13,6 @@ using Traits
 
 
 
-if map(+, 1, 1) == [2]
-    import Base: map
-    # This function is missing in Base
-    @generated function map(f, x::Number, ys::Number...)
-        Expr(:call, :f, :x, [:(ys[$n]) for n in 1:length(ys)]...)
-    end
-end
-@test map(+, 1, 1) == 2
-
-
-
 # scalars
 
 function test_Scalar(S::Type)

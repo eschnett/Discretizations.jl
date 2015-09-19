@@ -6,13 +6,11 @@ module VectorSpaces
 using Traits
 
 import Base: show
-import Base: mod
 import Base: ==, isequal, hash
 import Base: start, next, done, eltype, length
 import Base: map
 
 export show
-export mod
 export ==, isequal, hash
 export start, next, done, eltype, length
 export map
@@ -31,9 +29,26 @@ tupletypes{T<:Tuple}(::Type{T}) = ntuple(d->fieldtype(T,d), nfields(T))
 
 
 
+if map(+, 1, 1) == [2]
+    import Base: map
+    export map
+    # This function is missing in Base
+    @generated function map(f, x::Number, ys::Number...)
+        Expr(:call, :f, :x, [:(ys[$n]) for n in 1:length(ys)]...)
+    end
+end
+@assert map(+, 1, 1) == 2
+
+
+
+# This function is not in Base
+import Base: mod
+export mod
 function mod{T<:Integer}(i::Rational{T}, ::Type{Rational{Bool}})
     mod(num(i), Bool) // Bool(den(i))
 end
+@assert mod(0//1, Rational{Bool}) == false//true
+@assert mod(1//1, Rational{Bool}) == true//true
 
 
 
