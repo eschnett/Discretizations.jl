@@ -113,7 +113,7 @@ smul{S<:Number}(a::Matrix{S}, b::Matrix{S}) = a * b
 # Abstract vector space definition
 
 export AbstractVS
-export veltype, vnewtype, vdim, vnull, vscale, vadd
+export veltype, vnewtype, vdim, vnull, vdir, vscale, vadd
 
 # Note: We don't want S as explicit argument, since we want to be able
 # to use AbstractVS even if only V is known
@@ -128,9 +128,10 @@ export veltype, vnewtype, vdim, vnull, vscale, vadd
     vdim(Type{V}) -> Int
     vdim(V) -> Int
 
-    # vconst(Type{V}, S) -> V
-    # vdir(Type{V}, Int) -> V
     vnull(Type{V}) -> V
+    # vconst(Type{V}, S) -> V
+    vdir(Type{V}, Integer) -> V
+    # vmake: create vector from collection
     
     vscale(S, V) -> V
     vadd(V, V) -> V
@@ -151,18 +152,22 @@ end
 
 _svtypes = [Bool,
             Int8, Int16, Int32, Int64, Int128, BigInt,
+            Rational{Bool},
             Rational{Int8}, Rational{Int16}, Rational{Int32}, Rational{Int64},
             Rational{Int128}, Rational{BigInt},
-            Float16, Float32, Float64, BigFloat,
-            Complex32, Complex64, Complex128, Complex{BigFloat}]
-ScalarVector = Union{_svtypes..., [Matrix{T} for T in _svtypes]...}
+            Float16, Float32, Float64, BigFloat]
+_svtypes = vcat(_svtypes, [Complex{T} for T in _svtypes])
+_svtypes = vcat(_svtypes, [Matrix{T} for T in _svtypes])
+ScalarVector = Union{_svtypes...}
 
 veltype{S<:ScalarVector}(::Type{S}) = S
 # vnewtype{S<:ScalarVector,R}(::Type{S}, ::Type{R}) = R
 vnewtype{S<:ScalarVector,R}(::Type{S}, R0::Type{R}) = R0
 vdim{S<:ScalarVector}(::Type{S}) = 1
 vdim(x::ScalarVector) = vdim(typeof(x))
+
 vnull{S<:ScalarVector}(::Type{S}) = sconst(S, 0)
+vdir{S<:ScalarVector}(::Type{S}, i::Integer) = sconst(S, 1)
 vscale{S<:ScalarVector}(a::S, x::S) = smul(a, x)
 vadd{S<:ScalarVector}(x::S, y::S) = sadd(x, y)
 
@@ -207,7 +212,9 @@ veltype{S}(::Type{EmptyVS{S}}) = S
 vnewtype{S,R}(::Type{EmptyVS{S}}, ::Type{R}) = EmptyVS{R}
 vdim{S}(::Type{EmptyVS{S}}) = 0
 vdim(x::EmptyVS) = vdim(typeof(x))
+
 vnull{S}(::Type{EmptyVS{S}}) = EmptyVS{S}()
+vdir{S}(::Type{EmptyVS{S}}, i::Integer) = throw(BoundsError(i))
 vscale{S}(a::S, x::EmptyVS{S}) = EmptyVS{S}()
 vadd{S}(x::EmptyVS{S}, y::EmptyVS{S}) = EmptyVS{S}()
 
@@ -257,7 +264,9 @@ veltype{S}(::Type{ScalarVS{S}}) = S
 vnewtype{S,R}(::Type{ScalarVS{S}}, ::Type{R}) = ScalarVS{R}
 vdim{S}(::Type{ScalarVS{S}}) = 1
 vdim(x::ScalarVS) = vdim(typeof(x))
+
 vnull{S}(::Type{ScalarVS{S}}) = ScalarVS{S}(sconst(S, 0))
+vdir{S}(::Type{ScalarVS{S}}, i::Integer) = ScalarVS{S}(sconst(S, 1))
 vscale{S}(a::S, x::ScalarVS{S}) = ScalarVS{S}(smul(a, x.elt))
 vadd{S}(x::ScalarVS{S}, y::ScalarVS{S}) = ScalarVS{S}(sadd(x.elt, y.elt))
 
@@ -348,6 +357,15 @@ end
 vdim(x::ProductVS) = vdim(x.v1) + vdim(x.v2)
 
 vnull{V1,V2}(::Type{ProductVS{V1,V2}}) = ProductVS{V1,V2}(vnull(V1), vnull(V2))
+function vdir{V1,V2}(::Type{ProductVS{V1,V2}}, i::Integer)
+    v1 = vnull(V1)
+    l1 = vdim(v1)
+    if i <= l1
+        ProductVS{V1,V2}(vdir(V1, i), vnull(V2))
+    else
+        ProductVS{V1,V2}(v1, vdir(V2, i-l1))
+    end
+end
 function vscale(a, x::ProductVS)
     V = typeof(x)
     S = veltype(V)
@@ -484,6 +502,21 @@ end
     end
 end
 
+function vdir{VS}(::Type{MultiProductVS{VS}}, i::Integer)
+    v0 = vnull(MultiProductVS{VS})
+    l = 0
+    for d in 1:nfields(VS)
+        ld = vdim(v0.vs[d])
+        if l < i <= l+ld
+            rs = tuple([d2==d ? vdir(fieldtype(VS, d), i-l) : v0.vs[d2]
+                        for d2 in 1:nfields(VS)]...)
+            return MultiProductVS{VS}(rs)
+        end
+        l += ld
+    end
+    throw(BoundsError(i))
+end
+
 @generated function vnull{VS}(::Type{MultiProductVS{VS}})
     quote
         rs = tuple($(map(T->:(vnull($T)), tupletypes(VS))...))
@@ -617,6 +650,19 @@ function vnull{V1,D}(::Type{PowerVS{V1,D}},
         r[i] = vnull(V1)
     end
     PowerVS{V1,D}(r)
+end
+function vdir{V1,D}(::Type{PowerVS{V1,D}}, i::Integer)
+    rs = vnull(PowerVS{V1,D})
+    l = 0
+    for d in eachindex(rs.vs)
+        ld = vdim(rs.vs[d])
+        if l < i <= l+ld
+            rs.vs[d] = vdir(V1, i-l)
+            return rs
+        end
+        l += ld
+    end
+    throw(BoundsError(i))
 end
 function vscale(a, x::PowerVS)
     V = typeof(x)

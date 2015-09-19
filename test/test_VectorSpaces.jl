@@ -114,6 +114,7 @@ function test_ScalarVector(V::Type)
 
     @test vdim(V) == 1
     @test vdim(z) == 1
+    @test vdir(V, 1) == sconst(S, 1)
     @test vscale(sconst(S, 1), z) == z
     @test vadd(z, z) == z
     @test vscale(sconst(S, 0), e) == z
@@ -132,6 +133,10 @@ function test_ScalarVectors()
     test_ScalarVector(Int)
     test_ScalarVector(Float64)
     test_ScalarVector(Complex128)
+    test_ScalarVector(Rational{Int})
+    test_ScalarVector(Complex{Rational{Int}})
+    test_ScalarVector(Matrix{Complex{Rational{Int}}})
+    test_ScalarVector(Rational{Int})
     test_ScalarVector(Matrix{Bool})
     test_ScalarVector(Matrix{Int})
     test_ScalarVector(Matrix{Float64})
@@ -168,6 +173,7 @@ function test_EmptyVS(S::Type)
 
     @test vdim(V) == 0
     @test vdim(z) == 0
+    @test_throws BoundsError vdir(V, 1)
     @test vscale(S(1), z) == z
     @test vadd(z, z) == z
 end
@@ -206,6 +212,7 @@ function test_ScalarVS(S::Type)
 
     @test vdim(V) == 1
     @test vdim(z) == 1
+    @test collect(vdir(V, 1)) == array(sconst(S, 1))
     @test vscale(sconst(S, 1), z) == z
     @test vadd(z, z) == z
     @test vscale(sconst(S, 0), e) == z
@@ -261,6 +268,13 @@ function test_ProductVS{V1,V2}(::Type{V1}, ::Type{V2}, e1::V1, e2::V2)
 
     @test vdim(V) == vdim(V1) + vdim(V2)
     @test vdim(z) == vdim(vnull(V1)) + vdim(vnull(V2))
+
+    l = vdim(V)
+    for d in [1, 2, 4, 8, 10, l÷2, l-2, l-1, l]
+        if 1<=d<=l
+            @test collect(vdir(V, d)) == S[sconst(S, i==d) for i in 1:l]
+        end
+    end
 
     @test vscale(sconst(S, 1), z) == z
     @test vadd(z, z) == z
@@ -339,6 +353,13 @@ function test_MultiProductVS{VS}(::Type{VS}, es::VS)
 
     @test vdim(V) == sum(vdim, tupletypes(VS))
     @test vdim(z) == sum(vdim, map(vnull, tupletypes(VS)))
+
+    l = vdim(V)
+    for d in [1, 2, 4, 8, 10, l÷2, l-2, l-1, l]
+        if 1<=d<=l
+            @test collect(vdir(V, d)) == S[sconst(S, i==d) for i in 1:l]
+        end
+    end
 
     @test vscale(sconst(S, 1), z) == z
     @test vadd(z, z) == z
@@ -421,6 +442,13 @@ function test_PowerVS{V1}(::Type{V1}, D::Integer, n::Tuple, e1::V1)
     @test vdim(z) == prod(n) * vdim(vnull(V1))
     @test vscale(sconst(S, 1), z) == z
     @test vadd(z, z) == z
+
+    l = vdim(V)
+    for d in [1, 2, 4, 8, 10, l÷2, l-2, l-1, l]
+        if 1<=d<=l
+            @test collect(vdir(V, d)) == S[sconst(S, i==d) for i in 1:l]
+        end
+    end
 
     @test vscale(sconst(S, 0), e) == z
     @test vscale(sconst(S, 1), e) == e
